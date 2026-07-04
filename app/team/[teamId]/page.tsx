@@ -13,13 +13,32 @@ export default async function TeamPage({ params }: PageProps) {
   const { teamId } = await params;
   const teamSlug = teamId;
 
-  const { data: team, error: teamError } = await supabase
-    .from("teams")
-    .select("*")
-    .eq("slug", teamSlug)
-    .single();
+  const [teamResult, roundResult, assetsResult] = await Promise.all([
+    supabase
+      .from("teams")
+      .select("*")
+      .eq("slug", teamSlug)
+      .single(),
 
-  if (teamError || !team) {
+    supabase
+      .from("rounds")
+      .select("*")
+      .eq("is_open", true)
+      .order("round_number", { ascending: true })
+      .limit(1)
+      .maybeSingle(),
+
+    supabase
+      .from("assets")
+      .select("*")
+      .order("name", { ascending: true }),
+  ]);
+
+  const team = teamResult.data;
+  const round = roundResult.data;
+  const assets = assetsResult.data ?? [];
+
+  if (teamResult.error || !team) {
     return (
       <main className="mx-auto max-w-3xl p-6">
         <h1 className="text-2xl font-bold">존재하지 않는 조입니다.</h1>
@@ -28,49 +47,39 @@ export default async function TeamPage({ params }: PageProps) {
     );
   }
 
-  const { data: round } = await supabase
-    .from("rounds")
-    .select("*")
-    .eq("is_open", true)
-    .order("round_number", { ascending: true })
-    .limit(1)
-    .maybeSingle();
-
-  const { data: assets } = await supabase
-    .from("assets")
-    .select("*")
-    .order("name", { ascending: true });
-
   let viewedHints: any[] = [];
   let alreadySubmitted = false;
 
   if (round) {
-    const { data: hintViews } = await supabase
-      .from("team_hint_views")
-      .select(
+    const [hintViewsResult, existingInvestmentsResult] = await Promise.all([
+      supabase
+        .from("team_hint_views")
+        .select(
+          `
+          hints (
+            id,
+            level,
+            content,
+            cost
+          )
         `
-        hints (
-          id,
-          level,
-          content,
-          cost
         )
-      `
-      )
-      .eq("team_id", team.id)
-      .eq("round_id", round.id);
+        .eq("team_id", team.id)
+        .eq("round_id", round.id),
+
+      supabase
+        .from("investments")
+        .select("id")
+        .eq("team_id", team.id)
+        .eq("round_id", round.id)
+        .limit(1),
+    ]);
 
     viewedHints =
-      hintViews?.map((item: any) => item.hints).filter(Boolean) ?? [];
+      hintViewsResult.data?.map((item: any) => item.hints).filter(Boolean) ??
+      [];
 
-    const { data: existingInvestments } = await supabase
-      .from("investments")
-      .select("id")
-      .eq("team_id", team.id)
-      .eq("round_id", round.id)
-      .limit(1);
-
-    alreadySubmitted = Boolean(existingInvestments?.length);
+    alreadySubmitted = Boolean(existingInvestmentsResult.data?.length);
   }
 
   return (
@@ -96,7 +105,7 @@ export default async function TeamPage({ params }: PageProps) {
           <InvestmentForm
             teamId={team.id}
             roundId={round.id}
-            assets={assets ?? []}
+            assets={assets}
             alreadySubmitted={alreadySubmitted}
           />
         </>
