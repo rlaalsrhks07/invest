@@ -1,44 +1,86 @@
-import { NextRequest, NextResponse } from "next/server";
+import {
+  NextRequest,
+  NextResponse,
+} from "next/server";
+
+import { HINTS, type HintLevel } from "@/lib/gameData";
 import { supabase } from "@/lib/supabase";
+
+function isHintLevel(value: unknown): value is HintLevel {
+  return (
+    value === "low" ||
+    value === "middle" ||
+    value === "high"
+  );
+}
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { teamId, roundId, level } = body;
 
-    if (!teamId || !roundId || !level) {
+    const teamId = body.teamId;
+    const roundId = body.roundId;
+    const level = body.level;
+
+    if (!teamId || !roundId || !isHintLevel(level)) {
       return NextResponse.json(
-        { error: "teamId, roundId, level이 필요합니다." },
+        {
+          error:
+            "올바른 teamId, roundId, level이 필요합니다.",
+        },
         { status: 400 }
       );
     }
 
-    const { data: hint, error: hintError } = await supabase
-      .from("hints")
-      .select("*")
-      .eq("round_id", roundId)
-      .eq("level", level)
-      .single();
+    const hint = HINTS.find(
+      (item) =>
+        item.round_id === roundId &&
+        item.level === level
+    );
 
-    if (hintError || !hint) {
+    if (!hint) {
       return NextResponse.json(
-        { error: "힌트를 찾을 수 없습니다." },
+        {
+          error: "힌트를 찾을 수 없습니다.",
+        },
         { status: 404 }
       );
     }
 
-    const { data: existingView } = await supabase
+    const {
+      data: existingView,
+      error: existingViewError,
+    } = await supabase
       .from("team_hint_views")
       .select("id")
       .eq("team_id", teamId)
       .eq("hint_id", hint.id)
       .maybeSingle();
 
-    if (existingView) {
-      return NextResponse.json({ hint });
+    if (existingViewError) {
+      console.error(
+        "힌트 열람 기록 확인 실패:",
+        existingViewError
+      );
+
+      return NextResponse.json(
+        {
+          error: "힌트 열람 기록 확인에 실패했습니다.",
+        },
+        { status: 500 }
+      );
     }
 
-    const { data: team, error: teamError } = await supabase
+    if (existingView) {
+      return NextResponse.json({
+        hint,
+      });
+    }
+
+    const {
+      data: team,
+      error: teamError,
+    } = await supabase
       .from("teams")
       .select("cash")
       .eq("id", teamId)
@@ -46,7 +88,9 @@ export async function POST(request: NextRequest) {
 
     if (teamError || !team) {
       return NextResponse.json(
-        { error: "팀 정보를 찾을 수 없습니다." },
+        {
+          error: "팀 정보를 찾을 수 없습니다.",
+        },
         { status: 404 }
       );
     }
@@ -54,9 +98,23 @@ export async function POST(request: NextRequest) {
     const currentCash = Number(team.cash);
     const cost = Number(hint.cost);
 
+    if (
+      !Number.isFinite(currentCash) ||
+      !Number.isFinite(cost)
+    ) {
+      return NextResponse.json(
+        {
+          error: "자금 또는 힌트 가격 정보가 올바르지 않습니다.",
+        },
+        { status: 500 }
+      );
+    }
+
     if (currentCash < cost) {
       return NextResponse.json(
-        { error: "힌트를 열람할 자금이 부족합니다." },
+        {
+          error: "힌트를 열람할 자금이 부족합니다.",
+        },
         { status: 400 }
       );
     }
@@ -69,8 +127,15 @@ export async function POST(request: NextRequest) {
       .eq("id", teamId);
 
     if (updateCashError) {
+      console.error(
+        "힌트 비용 차감 실패:",
+        updateCashError
+      );
+
       return NextResponse.json(
-        { error: "힌트 비용 차감에 실패했습니다." },
+        {
+          error: "힌트 비용 차감에 실패했습니다.",
+        },
         { status: 500 }
       );
     }
@@ -84,18 +149,47 @@ export async function POST(request: NextRequest) {
       });
 
     if (insertViewError) {
+      console.error(
+        "힌트 열람 기록 저장 실패:",
+        insertViewError
+      );
+
+      // 기록 저장 실패 시 차감한 돈을 되돌립니다.
+      const { error: rollbackError } = await supabase
+        .from("teams")
+        .update({
+          cash: currentCash,
+        })
+        .eq("id", teamId);
+
+      if (rollbackError) {
+        console.error(
+          "힌트 비용 복구 실패:",
+          rollbackError
+        );
+      }
+
       return NextResponse.json(
-        { error: "힌트 열람 기록 저장에 실패했습니다." },
+        {
+          error: "힌트 열람 기록 저장에 실패했습니다.",
+        },
         { status: 500 }
       );
     }
 
-    return NextResponse.json({ hint });
+    return NextResponse.json({
+      hint,
+    });
   } catch (error) {
-    console.error(error);
+    console.error(
+      "힌트 열람 API 오류:",
+      error
+    );
 
     return NextResponse.json(
-      { error: "서버 오류가 발생했습니다." },
+      {
+        error: "서버 오류가 발생했습니다.",
+      },
       { status: 500 }
     );
   }
