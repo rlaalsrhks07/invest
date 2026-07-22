@@ -92,7 +92,7 @@ export default function AssetPriceChart({
 
   if (points.length === 0) {
     return (
-      <div className="mt-4 rounded-xl border border-zinc-200 bg-zinc-50 p-4 text-sm text-zinc-500">
+      <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
         가격 데이터를 불러올 수 없습니다.
       </div>
     );
@@ -115,24 +115,24 @@ export default function AssetPriceChart({
     const baselineY = getY(100);
 
     return (
-      <div className="mt-4 rounded-xl border border-zinc-200 bg-zinc-50 p-3">
+      <div className="mt-4 rounded-xl border border-indigo-100 bg-gradient-to-br from-slate-50 to-indigo-50/50 p-3">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <div className="text-xs font-bold text-zinc-400">
+            <div className="text-xs font-bold text-slate-400">
               과거 가격지수
             </div>
 
-            <div className="mt-1 text-sm font-black text-zinc-900">
+            <div className="mt-1 text-sm font-black text-slate-900">
               2015년 = 100
             </div>
           </div>
 
           <div className="text-right">
-            <div className="text-xs text-zinc-400">
+            <div className="text-xs text-slate-400">
               누적 변화
             </div>
 
-            <div className="mt-1 text-sm font-black text-zinc-700">
+            <div className="mt-1 text-sm font-black text-slate-600">
               0.0%
             </div>
           </div>
@@ -155,7 +155,7 @@ export default function AssetPriceChart({
                   x2={WIDTH - PADDING.right}
                   y2={y}
                   stroke="currentColor"
-                  className="text-zinc-200"
+                  className="text-slate-200"
                   strokeWidth="1"
                 />
 
@@ -164,7 +164,7 @@ export default function AssetPriceChart({
                   y={y + 4}
                   textAnchor="end"
                   fill="currentColor"
-                  className="text-[10px] text-zinc-400"
+                  className="text-[10px] text-slate-400"
                 >
                   {tick}
                 </text>
@@ -178,7 +178,7 @@ export default function AssetPriceChart({
             x2={WIDTH - PADDING.right}
             y2={baselineY}
             stroke="currentColor"
-            className="text-zinc-800"
+            className="text-indigo-600"
             strokeWidth="3"
             strokeLinecap="round"
           />
@@ -188,7 +188,7 @@ export default function AssetPriceChart({
             y={HEIGHT - 9}
             textAnchor="start"
             fill="currentColor"
-            className="text-[10px] text-zinc-500"
+            className="text-[10px] text-slate-500"
           >
             2015
           </text>
@@ -198,7 +198,7 @@ export default function AssetPriceChart({
             y={HEIGHT - 9}
             textAnchor="end"
             fill="currentColor"
-            className="text-[10px] text-zinc-500"
+            className="text-[10px] text-slate-500"
           >
             투자 시점
           </text>
@@ -226,6 +226,7 @@ export default function AssetPriceChart({
     maxValue += 10;
   } else {
     const range = maxValue - minValue;
+
     const margin = Math.max(
       range * 0.15,
       5
@@ -283,20 +284,20 @@ export default function AssetPriceChart({
   const baselineY = getY(100);
 
   return (
-    <div className="mt-4 rounded-xl border border-zinc-200 bg-zinc-50 p-3">
+    <div className="mt-4 rounded-xl border border-indigo-100 bg-gradient-to-br from-slate-50 to-indigo-50/50 p-3">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="text-xs font-bold text-zinc-400">
+          <div className="text-xs font-bold text-slate-400">
             과거 가격지수
           </div>
 
-          <div className="mt-1 text-sm font-black text-zinc-900">
+          <div className="mt-1 text-sm font-black text-slate-900">
             2015년 = 100
           </div>
         </div>
 
         <div className="text-right">
-          <div className="text-xs text-zinc-400">
+          <div className="text-xs text-slate-400">
             누적 변화
           </div>
 
@@ -306,7 +307,7 @@ export default function AssetPriceChart({
                 ? "text-red-600"
                 : cumulativeReturn < 0
                   ? "text-blue-600"
-                  : "text-zinc-700"
+                  : "text-slate-600"
             }`}
           >
             {cumulativeReturn > 0 ? "+" : ""}
@@ -332,7 +333,7 @@ export default function AssetPriceChart({
                 x2={WIDTH - PADDING.right}
                 y2={y}
                 stroke="currentColor"
-                className="text-zinc-200"
+                className="text-slate-200"
                 strokeWidth="1"
               />
 
@@ -341,7 +342,7 @@ export default function AssetPriceChart({
                 y={y + 4}
                 textAnchor="end"
                 fill="currentColor"
-                className="text-[10px] text-zinc-400"
+                className="text-[10px] text-slate-400"
               >
                 {tick}
               </text>
@@ -358,7 +359,7 @@ export default function AssetPriceChart({
               x2={WIDTH - PADDING.right}
               y2={baselineY}
               stroke="currentColor"
-              className="text-zinc-300"
+              className="text-indigo-200"
               strokeWidth="1.5"
               strokeDasharray="5 5"
             />
@@ -368,7 +369,7 @@ export default function AssetPriceChart({
           d={pathData}
           fill="none"
           stroke="currentColor"
-          className="text-zinc-950"
+          className="text-indigo-600"
           strokeWidth="3"
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -392,7 +393,7 @@ export default function AssetPriceChart({
                 cy={y}
                 r="4"
                 fill="currentColor"
-                className="text-zinc-950"
+                className="text-indigo-600"
               />
 
               <text
@@ -400,7 +401,7 @@ export default function AssetPriceChart({
                 y={HEIGHT - 9}
                 textAnchor="middle"
                 fill="currentColor"
-                className="text-[10px] text-zinc-500"
+                className="text-[10px] text-slate-500"
               >
                 {point.year}
               </text>
@@ -410,7 +411,7 @@ export default function AssetPriceChart({
                 y={labelY}
                 textAnchor="middle"
                 fill="currentColor"
-                className="text-[9px] font-bold text-zinc-600"
+                className="text-[9px] font-bold text-slate-600"
               >
                 {point.value.toFixed(0)}
               </text>

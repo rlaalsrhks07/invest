@@ -14,18 +14,14 @@ export default function TeamLeaderboard({
   currentTeamId,
 }: TeamLeaderboardProps) {
   return (
-    <section className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
-      <header className="border-b border-zinc-200 p-5">
-        <div className="text-xs font-bold tracking-[0.18em] text-zinc-400">
-          LEADERBOARD
-        </div>
-
-        <h2 className="mt-1 text-xl font-black text-zinc-950">
-          현재 리더보드
+    <section className="overflow-hidden rounded-2xl border border-indigo-100 bg-white shadow-lg shadow-indigo-100/60">
+      <header className="border-b border-indigo-100 bg-gradient-to-r from-indigo-50 to-sky-50 p-5">
+        <h2 className="text-xl font-black text-slate-900">
+          리더보드
         </h2>
       </header>
 
-      <div className="divide-y divide-zinc-100">
+      <div className="divide-y divide-slate-100">
         {entries.map((entry, index) => {
           const isCurrentTeam =
             entry.teamId === currentTeamId;
@@ -35,17 +31,17 @@ export default function TeamLeaderboard({
               key={entry.teamId}
               className={
                 isCurrentTeam
-                  ? "flex items-center gap-3 bg-zinc-950 px-4 py-4 text-white"
-                  : "flex items-center gap-3 px-4 py-4"
+                  ? "flex items-center gap-3 bg-gradient-to-r from-indigo-600 to-blue-600 px-4 py-4 text-white"
+                  : "flex items-center gap-3 px-4 py-4 transition hover:bg-indigo-50/40"
               }
             >
               <div
                 className={
                   isCurrentTeam
-                    ? "flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white font-black text-zinc-950"
+                    ? "flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white font-black text-indigo-700 shadow-sm"
                     : index === 0
-                      ? "flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-100 font-black text-amber-800"
-                      : "flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-zinc-100 font-black text-zinc-600"
+                      ? "flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-amber-200 to-yellow-300 font-black text-amber-900 shadow-sm"
+                      : "flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-indigo-50 font-black text-indigo-500"
                 }
               >
                 {index + 1}

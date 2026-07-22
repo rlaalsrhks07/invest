@@ -27,24 +27,48 @@ const LEVEL_META: Record<
   HintLevel,
   {
     label: string;
-    englishLabel: string;
     percent: number;
+    cardClass: string;
+    viewedClass: string;
+    badgeClass: string;
+    buttonClass: string;
   }
 > = {
   low: {
     label: "하",
-    englishLabel: "BASIC",
     percent: 10,
+    cardClass:
+      "border-sky-200 bg-gradient-to-br from-sky-50 to-white",
+    viewedClass:
+      "border-sky-500 bg-gradient-to-br from-sky-600 to-cyan-600 text-white",
+    badgeClass:
+      "bg-sky-100 text-sky-700",
+    buttonClass:
+      "bg-sky-600 hover:bg-sky-700",
   },
   middle: {
     label: "중",
-    englishLabel: "DETAIL",
     percent: 20,
+    cardClass:
+      "border-indigo-200 bg-gradient-to-br from-indigo-50 to-white",
+    viewedClass:
+      "border-indigo-500 bg-gradient-to-br from-indigo-600 to-blue-600 text-white",
+    badgeClass:
+      "bg-indigo-100 text-indigo-700",
+    buttonClass:
+      "bg-indigo-600 hover:bg-indigo-700",
   },
   high: {
     label: "상",
-    englishLabel: "ANALYSIS",
     percent: 30,
+    cardClass:
+      "border-violet-200 bg-gradient-to-br from-violet-50 to-white",
+    viewedClass:
+      "border-violet-500 bg-gradient-to-br from-violet-600 to-purple-600 text-white",
+    badgeClass:
+      "bg-violet-100 text-violet-700",
+    buttonClass:
+      "bg-violet-600 hover:bg-violet-700",
   },
 };
 
@@ -77,12 +101,15 @@ export default function HintPanel({
         disabledReason ??
           "현재는 힌트를 구매할 수 없습니다."
       );
+
       return;
     }
 
-    const alreadyViewed = viewedHints.find(
-      (hint) => hint.level === level
-    );
+    const alreadyViewed =
+      viewedHints.find(
+        (hint) =>
+          hint.level === level
+      );
 
     if (alreadyViewed) {
       alert("이미 열람한 힌트입니다.");
@@ -97,11 +124,9 @@ export default function HintPanel({
     );
 
     const ok = confirm(
-      `${meta.label} 힌트를 열람하시겠습니까?\n\n현재 자산의 ${
-        meta.percent
-      }%인 ${estimatedCost.toLocaleString(
+      `${meta.label} 힌트를 구매하시겠습니까?\n\n${estimatedCost.toLocaleString(
         "ko-KR"
-      )}원이 차감될 예정입니다.`
+      )}원이 차감됩니다.`
     );
 
     if (!ok) {
@@ -127,13 +152,15 @@ export default function HintPanel({
         }
       );
 
-      const data = await response.json();
+      const data =
+        await response.json();
 
       if (!response.ok) {
         alert(
           data.error ??
             "힌트 열람에 실패했습니다."
         );
+
         return;
       }
 
@@ -145,14 +172,19 @@ export default function HintPanel({
       } as ViewedHint;
 
       setViewedHints((previous) => {
-        const exists = previous.some(
-          (hint) =>
-            hint.id === viewedHint.id
-        );
+        const exists =
+          previous.some(
+            (hint) =>
+              hint.id ===
+              viewedHint.id
+          );
 
         return exists
           ? previous
-          : [...previous, viewedHint];
+          : [
+              ...previous,
+              viewedHint,
+            ];
       });
 
       setAvailableCash(
@@ -180,36 +212,30 @@ export default function HintPanel({
   };
 
   return (
-    <section className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+    <section className="rounded-2xl border border-indigo-100 bg-white p-6 shadow-lg shadow-indigo-100/40">
       <header>
-        <div className="text-xs font-bold tracking-[0.18em] text-zinc-400">
-          HINT SHOP
-        </div>
-
-        <h2 className="mt-2 text-2xl font-black text-zinc-950">
+        <h2 className="text-2xl font-black text-slate-900">
           힌트 상점
         </h2>
-
-        <p className="mt-2 text-sm text-zinc-500">
-          힌트 비용은 구매 직전의 현재 자산을
-          기준으로 계산됩니다.
-        </p>
       </header>
 
-      {disabled && disabledReason && (
-        <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm font-medium text-amber-800">
-          {disabledReason}
-        </div>
-      )}
+      {disabled &&
+        disabledReason && (
+          <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm font-medium text-amber-800">
+            {disabledReason}
+          </div>
+        )}
 
       <div className="mt-6 grid grid-cols-3 gap-4">
         {LEVELS.map((level) => {
-          const meta = LEVEL_META[level];
+          const meta =
+            LEVEL_META[level];
 
           const viewedHint =
             viewedHints.find(
               (hint) =>
-                hint.level === level
+                hint.level ===
+                level
             );
 
           const isLoading =
@@ -224,34 +250,22 @@ export default function HintPanel({
           return (
             <article
               key={level}
-              className={
+              className={`rounded-2xl border p-5 shadow-sm transition ${
                 viewedHint
-                  ? "rounded-2xl border border-zinc-950 bg-zinc-950 p-5 text-white"
-                  : "rounded-2xl border border-zinc-200 bg-zinc-50 p-5"
-              }
+                  ? meta.viewedClass
+                  : meta.cardClass
+              }`}
             >
               <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div
-                    className={
-                      viewedHint
-                        ? "text-xs font-bold tracking-[0.16em] text-white/50"
-                        : "text-xs font-bold tracking-[0.16em] text-zinc-400"
-                    }
-                  >
-                    {meta.englishLabel}
-                  </div>
-
-                  <h3 className="mt-1 text-xl font-black">
-                    {meta.label} 힌트
-                  </h3>
-                </div>
+                <h3 className="text-xl font-black">
+                  {meta.label} 힌트
+                </h3>
 
                 <span
                   className={
                     viewedHint
                       ? "rounded-full bg-white/15 px-3 py-1 text-sm font-black"
-                      : "rounded-full bg-white px-3 py-1 text-sm font-black text-zinc-900 shadow-sm"
+                      : `rounded-full px-3 py-1 text-sm font-black ${meta.badgeClass}`
                   }
                 >
                   {meta.percent}%
@@ -261,15 +275,15 @@ export default function HintPanel({
               <div
                 className={
                   viewedHint
-                    ? "mt-4 rounded-xl bg-white/10 p-3"
-                    : "mt-4 rounded-xl bg-white p-3"
+                    ? "mt-5 rounded-xl bg-white/10 p-3"
+                    : "mt-5 rounded-xl bg-white/80 p-3 shadow-sm"
                 }
               >
                 <div
                   className={
                     viewedHint
-                      ? "text-xs text-white/50"
-                      : "text-xs text-zinc-400"
+                      ? "text-xs text-white/60"
+                      : "text-xs text-slate-400"
                   }
                 >
                   {viewedHint
@@ -281,7 +295,9 @@ export default function HintPanel({
                   {(
                     viewedHint?.deductedAmount ??
                     estimatedCost
-                  ).toLocaleString("ko-KR")}
+                  ).toLocaleString(
+                    "ko-KR"
+                  )}
                   원
                 </div>
               </div>
@@ -293,13 +309,15 @@ export default function HintPanel({
                 }
                 disabled={
                   disabled ||
-                  Boolean(viewedHint) ||
+                  Boolean(
+                    viewedHint
+                  ) ||
                   isLoading
                 }
                 className={
                   viewedHint
-                    ? "mt-4 w-full rounded-xl bg-white/10 px-4 py-3 font-black text-white/60"
-                    : "mt-4 w-full rounded-xl bg-zinc-950 px-4 py-3 font-black text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-40"
+                    ? "mt-4 w-full rounded-xl bg-white/15 px-4 py-3 font-black text-white/70"
+                    : `mt-4 w-full rounded-xl px-4 py-3 font-black text-white transition disabled:cursor-not-allowed disabled:opacity-40 ${meta.buttonClass}`
                 }
               >
                 {viewedHint
@@ -313,9 +331,10 @@ export default function HintPanel({
         })}
       </div>
 
-      {viewedHints.length > 0 && (
-        <div className="mt-8 space-y-4 border-t border-zinc-200 pt-6">
-          <h3 className="text-lg font-black text-zinc-950">
+      {viewedHints.length >
+        0 && (
+        <div className="mt-8 space-y-4 border-t border-indigo-100 pt-6">
+          <h3 className="text-lg font-black text-slate-900">
             구매한 힌트
           </h3>
 
@@ -323,44 +342,49 @@ export default function HintPanel({
             .slice()
             .sort(
               (a, b) =>
-                LEVELS.indexOf(a.level) -
-                LEVELS.indexOf(b.level)
+                LEVELS.indexOf(
+                  a.level
+                ) -
+                LEVELS.indexOf(
+                  b.level
+                )
             )
             .map((hint) => {
               const meta =
-                LEVEL_META[hint.level];
+                LEVEL_META[
+                  hint.level
+                ];
 
               return (
                 <article
                   key={hint.id}
-                  className="rounded-2xl border border-zinc-200 bg-zinc-50 p-6"
+                  className="rounded-2xl border border-indigo-100 bg-gradient-to-br from-slate-50 to-indigo-50/50 p-6"
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div>
-                      <div className="text-xs font-bold text-zinc-400">
-                        {meta.label} 힌트 ·{" "}
-                        {Math.round(
-                          hint.deductionRate *
-                            100
-                        )}
-                        %
+                      <div className="text-sm font-bold text-indigo-500">
+                        {meta.label} 힌트
                       </div>
 
-                      <div className="mt-2 text-sm font-bold text-zinc-500">
-                        [{hint.sourceLabel}]
+                      <div className="mt-2 text-sm font-bold text-slate-500">
+                        [
+                        {
+                          hint.sourceLabel
+                        }
+                        ]
                       </div>
 
-                      <h4 className="mt-1 text-xl font-black text-zinc-950">
+                      <h4 className="mt-1 text-xl font-black text-slate-900">
                         {hint.title}
                       </h4>
                     </div>
 
                     <div className="shrink-0 rounded-xl bg-white px-4 py-3 text-right shadow-sm">
-                      <div className="text-xs text-zinc-400">
+                      <div className="text-xs text-slate-400">
                         차감액
                       </div>
 
-                      <div className="mt-1 font-black">
+                      <div className="mt-1 whitespace-nowrap font-black text-slate-900">
                         {hint.deductedAmount.toLocaleString(
                           "ko-KR"
                         )}
@@ -369,7 +393,7 @@ export default function HintPanel({
                     </div>
                   </div>
 
-                  <p className="mt-5 whitespace-pre-wrap text-[15px] leading-8 text-zinc-700">
+                  <p className="mt-5 whitespace-pre-wrap text-[15px] leading-8 text-slate-700">
                     {hint.content}
                   </p>
                 </article>
