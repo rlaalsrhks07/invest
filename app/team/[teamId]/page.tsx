@@ -447,7 +447,7 @@ export default async function TeamPage({
 
                 <div className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3 backdrop-blur-sm">
                   <div className="text-xs text-white/50">
-                    주식자산
+                    투자자산
                   </div>
 
                   <div className="mt-1 whitespace-nowrap font-black tabular-nums">
