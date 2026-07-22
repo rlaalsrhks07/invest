@@ -38,7 +38,7 @@ create table public.investments (
   team_id text not null references public.teams(id) on delete cascade,
   round_id text not null references public.rounds(id) on delete cascade,
   asset_id text not null,
-  amount bigint not null check (amount > 0),
+  amount bigint not null check (amount >= 0),
   created_at timestamptz not null default now(),
   unique (team_id, round_id, asset_id)
 );
