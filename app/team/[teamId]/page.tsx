@@ -475,73 +475,41 @@ export default async function TeamPage({
           </div>
         </header>
 
-        <div className="mt-6 grid grid-cols-[minmax(0,1fr)_320px] items-start gap-6">
-          <div className="min-w-0 space-y-6">
-            <RoundStatus
-              round={round}
-            />
+<div className="mt-6 grid grid-cols-[320px_minmax(0,1fr)] items-start gap-6">
+  <aside className="sticky top-6 self-start">
+    <TeamLeaderboard
+      entries={leaderboardEntries}
+      currentTeamId={teamInfo.id}
+    />
+  </aside>
 
-            {round && (
-              <>
-                <HintPanel
-                  teamId={
-                    teamInfo.id
-                  }
-                  roundId={
-                    round.id
-                  }
-                  currentCash={
-                    currentCash
-                  }
-                  initialViewedHints={
-                    viewedHints
-                  }
-                  disabled={
-                    hintDisabled
-                  }
-                  disabledReason={
-                    hintDisabledReason
-                  }
-                />
+  <div className="min-w-0 space-y-6">
+    <RoundStatus round={round} />
 
-                <InvestmentForm
-                  teamId={
-                    teamInfo.id
-                  }
-                  roundId={
-                    round.id
-                  }
-                  assets={
-                    ASSETS
-                  }
-                  currentCash={
-                    currentCash
-                  }
-                  alreadySubmitted={
-                    alreadySubmitted
-                  }
-                  disabled={
-                    resultIsOpen
-                  }
-                  disabledReason={
-                    investmentDisabledReason
-                  }
-                />
-              </>
-            )}
-          </div>
+    {round && (
+      <>
+        <HintPanel
+          teamId={teamInfo.id}
+          roundId={round.id}
+          currentCash={currentCash}
+          initialViewedHints={viewedHints}
+          disabled={hintDisabled}
+          disabledReason={hintDisabledReason}
+        />
 
-          <aside className="sticky top-6 self-start">
-            <TeamLeaderboard
-              entries={
-                leaderboardEntries
-              }
-              currentTeamId={
-                teamInfo.id
-              }
-            />
-          </aside>
-        </div>
+        <InvestmentForm
+          teamId={teamInfo.id}
+          roundId={round.id}
+          assets={ASSETS}
+          currentCash={currentCash}
+          alreadySubmitted={alreadySubmitted}
+          disabled={resultIsOpen}
+          disabledReason={investmentDisabledReason}
+        />
+      </>
+    )}
+  </div>
+</div>
       </div>
     </main>
   );
