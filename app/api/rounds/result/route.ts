@@ -1,14 +1,14 @@
-import {
-  NextRequest,
-  NextResponse,
-} from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
-import { ASSET_PRICES } from "@/lib/gameData";
+import {
+  getAssetReturn,
+  getRoundById,
+  getTeamById,
+} from "@/lib/gameData";
 import { calculateResultAmount } from "@/lib/scoring";
 import { supabase } from "@/lib/supabase";
 
 type InvestmentRow = {
-  id: string;
   team_id: string;
   asset_id: string;
   amount: number | string;
@@ -17,213 +17,146 @@ type InvestmentRow = {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const roundId = body.roundId;
+    const roundId = String(body.roundId ?? "");
 
-    if (!roundId) {
+    if (!getRoundById(roundId)) {
       return NextResponse.json(
-        {
-          error: "roundId가 필요합니다.",
-        },
+        { error: "올바르지 않은 라운드입니다." },
         { status: 400 }
       );
     }
 
-    const {
-      data: round,
-      error: roundError,
-    } = await supabase
+    const { data: roundState, error: roundError } = await supabase
       .from("rounds")
-      .select("*")
+      .select("is_open, is_result_open")
       .eq("id", roundId)
       .single();
 
-    if (roundError || !round) {
+    if (roundError || !roundState) {
       return NextResponse.json(
-        {
-          error: "라운드를 찾을 수 없습니다.",
-        },
-        { status: 404 }
-      );
-    }
-
-    if (round.is_result_open) {
-      return NextResponse.json(
-        {
-          error: "이미 결과가 공개된 라운드입니다.",
-        },
-        { status: 400 }
-      );
-    }
-
-    const {
-      data: investmentData,
-      error: investmentError,
-    } = await supabase
-      .from("investments")
-      .select(
-        `
-        id,
-        team_id,
-        asset_id,
-        amount
-        `
-      )
-      .eq("round_id", roundId);
-
-    if (investmentError) {
-      console.error(
-        "투자 내역 조회 실패:",
-        investmentError
-      );
-
-      return NextResponse.json(
-        {
-          error: "투자 내역 조회에 실패했습니다.",
-        },
+        { error: "라운드 상태를 확인할 수 없습니다." },
         { status: 500 }
       );
     }
 
-    const investments =
-      (investmentData ?? []) as InvestmentRow[];
-
-    const prices = ASSET_PRICES.filter(
-      (price) => price.round_id === roundId
-    );
-
-    if (prices.length === 0) {
+    if (!roundState.is_open) {
       return NextResponse.json(
-        {
-          error:
-            "현재 라운드의 가격 데이터가 코드에 없습니다.",
-        },
+        { error: "현재 열려 있는 라운드가 아닙니다." },
+        { status: 400 }
+      );
+    }
+
+    if (roundState.is_result_open) {
+      return NextResponse.json(
+        { error: "이미 결과가 공개된 라운드입니다." },
+        { status: 400 }
+      );
+    }
+
+    const { data: investmentData, error: investmentError } = await supabase
+      .from("investments")
+      .select("team_id, asset_id, amount")
+      .eq("round_id", roundId);
+
+    if (investmentError) {
+      console.error("투자 내역 조회 실패:", investmentError);
+      return NextResponse.json(
+        { error: "투자 내역 조회에 실패했습니다." },
         { status: 500 }
       );
     }
 
     const teamResultMap = new Map<string, number>();
 
-    for (const investment of investments) {
-      const price = prices.find(
-        (item) =>
-          item.asset_id === investment.asset_id
-      );
-
-      if (!price) {
-        console.error(
-          `가격 정보 없음: round=${roundId}, asset=${investment.asset_id}`
-        );
+    for (const investment of (investmentData ?? []) as InvestmentRow[]) {
+      if (!getTeamById(investment.team_id)) {
+        console.error("알 수 없는 팀 투자 내역:", investment.team_id);
         continue;
       }
 
-      const investmentAmount = Number(
-        investment.amount
-      );
+      const returnData = getAssetReturn(roundId, investment.asset_id);
 
-      if (
-        !Number.isFinite(investmentAmount) ||
-        investmentAmount <= 0
-      ) {
+      if (!returnData) {
+        console.error(
+          `가격 데이터 없음: round=${roundId}, asset=${investment.asset_id}`
+        );
+        return NextResponse.json(
+          {
+            error: `산업 ${investment.asset_id}의 수익률 데이터가 없습니다.`,
+          },
+          { status: 500 }
+        );
+      }
+
+      const amount = Number(investment.amount);
+
+      if (!Number.isSafeInteger(amount) || amount <= 0) {
+        console.error("올바르지 않은 투자 금액:", investment);
         continue;
       }
 
       const resultAmount = calculateResultAmount(
-        investmentAmount,
-        price.start_price,
-        price.end_price
+        amount,
+        100,
+        100 + returnData.returnRate
       );
-
-      const previousAmount =
-        teamResultMap.get(investment.team_id) ?? 0;
 
       teamResultMap.set(
         investment.team_id,
-        previousAmount + resultAmount
+        (teamResultMap.get(investment.team_id) ?? 0) + resultAmount
       );
     }
 
-    for (const [
-      teamId,
-      resultAmount,
-    ] of teamResultMap.entries()) {
-      const {
-        data: team,
-        error: teamError,
-      } = await supabase
+    for (const [teamId, resultAmount] of teamResultMap.entries()) {
+      const { data: team, error: teamError } = await supabase
         .from("teams")
         .select("cash")
         .eq("id", teamId)
         .single();
 
       if (teamError || !team) {
-        console.error(
-          `팀 자금 조회 실패: ${teamId}`,
-          teamError
-        );
-
+        console.error(`팀 자금 조회 실패: ${teamId}`, teamError);
         return NextResponse.json(
-          {
-            error:
-              "일부 팀의 자금 정보를 불러오지 못했습니다.",
-          },
+          { error: "일부 팀의 자금 정보를 불러오지 못했습니다." },
           { status: 500 }
         );
       }
 
       const currentCash = Number(team.cash);
+      const nextCash = currentCash + resultAmount;
 
-      if (!Number.isFinite(currentCash)) {
+      const { data: updatedTeam, error: updateTeamError } = await supabase
+        .from("teams")
+        .update({ cash: nextCash })
+        .eq("id", teamId)
+        .eq("cash", currentCash)
+        .select("id")
+        .maybeSingle();
+
+      if (updateTeamError || !updatedTeam) {
+        console.error(`팀 자금 반영 실패: ${teamId}`, updateTeamError);
         return NextResponse.json(
           {
             error:
-              "팀의 현재 자금 정보가 올바르지 않습니다.",
+              "일부 팀의 자금이 동시에 변경되었습니다. 다시 시도하기 전에 팀별 자금을 확인해 주세요.",
           },
-          { status: 500 }
-        );
-      }
-
-      const { error: updateTeamError } =
-        await supabase
-          .from("teams")
-          .update({
-            cash: currentCash + resultAmount,
-          })
-          .eq("id", teamId);
-
-      if (updateTeamError) {
-        console.error(
-          `팀 자금 반영 실패: ${teamId}`,
-          updateTeamError
-        );
-
-        return NextResponse.json(
-          {
-            error:
-              "일부 팀의 투자 결과 반영에 실패했습니다.",
-          },
-          { status: 500 }
+          { status: 409 }
         );
       }
     }
 
-    const { error: updateRoundError } =
-      await supabase
-        .from("rounds")
-        .update({
-          is_result_open: true,
-        })
-        .eq("id", roundId);
+    const { data: updatedRound, error: updateRoundError } = await supabase
+      .from("rounds")
+      .update({ is_result_open: true })
+      .eq("id", roundId)
+      .eq("is_result_open", false)
+      .select("id")
+      .maybeSingle();
 
-    if (updateRoundError) {
-      console.error(
-        "결과 공개 상태 변경 실패:",
-        updateRoundError
-      );
-
+    if (updateRoundError || !updatedRound) {
+      console.error("결과 공개 상태 변경 실패:", updateRoundError);
       return NextResponse.json(
-        {
-          error: "결과 공개 상태 변경에 실패했습니다.",
-        },
+        { error: "결과 공개 상태 변경에 실패했습니다." },
         { status: 500 }
       );
     }
@@ -233,15 +166,9 @@ export async function POST(request: NextRequest) {
       results: Object.fromEntries(teamResultMap),
     });
   } catch (error) {
-    console.error(
-      "결과 공개 API 오류:",
-      error
-    );
-
+    console.error("결과 공개 API 오류:", error);
     return NextResponse.json(
-      {
-        error: "서버 오류가 발생했습니다.",
-      },
+      { error: "서버 오류가 발생했습니다." },
       { status: 500 }
     );
   }

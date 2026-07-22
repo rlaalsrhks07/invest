@@ -1,122 +1,243 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useCallback, useEffect, useMemo, useState } from "react";
+
+import {
+  INITIAL_CASH,
+  ROUNDS,
+  TEAMS,
+  type StaticRound,
+  type StaticTeam,
+} from "@/lib/gameData";
 import { supabase } from "@/lib/supabase";
 
-type Round = {
+type RoundStateRow = {
   id: string;
-  round_number: number;
-  start_year: number;
-  end_year: number;
   is_open: boolean;
   is_result_open: boolean;
 };
 
-type Team = {
+type TeamStateRow = {
   id: string;
-  slug: string;
-  name: string;
+  cash: number | string;
+};
+
+type InvestmentRow = {
+  id: number;
+  team_id: string;
+  round_id: string;
+};
+
+type HintViewRow = {
+  id: number;
+  team_id: string;
+  round_id: string;
+};
+
+type AdminRound = StaticRound & {
+  isOpen: boolean;
+  isResultOpen: boolean;
+};
+
+type AdminTeam = StaticTeam & {
   cash: number;
 };
 
-type Investment = {
-  id: string;
-  team_id: string;
-  round_id: string;
-};
-
-type HintView = {
-  id: string;
-  team_id: string;
-  round_id: string;
-};
-
 export default function AdminPage() {
-  const [rounds, setRounds] = useState<Round[]>([]);
-  const [teams, setTeams] = useState<Team[]>([]);
-  const [investments, setInvestments] = useState<Investment[]>([]);
-  const [hintViews, setHintViews] = useState<HintView[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [rounds, setRounds] = useState<AdminRound[]>([]);
+  const [teams, setTeams] = useState<AdminTeam[]>([]);
+  const [investments, setInvestments] = useState<InvestmentRow[]>([]);
+  const [hintViews, setHintViews] = useState<HintViewRow[]>([]);
+  const [loadingAction, setLoadingAction] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  const currentRound = rounds.find((round) => round.is_open);
+  const currentRound = rounds.find((round) => round.isOpen);
 
-  const loadData = async () => {
-    const { data: roundData } = await supabase
-      .from("rounds")
-      .select("*")
-      .order("round_number", { ascending: true });
+  const rankedTeams = useMemo(
+    () => teams.slice().sort((a, b) => b.cash - a.cash),
+    [teams]
+  );
 
-    const { data: teamData } = await supabase
-      .from("teams")
-      .select("*")
-      .order("slug", { ascending: true });
+  const loadData = useCallback(async () => {
+    setLoadError(null);
 
-    const { data: investmentData } = await supabase
-      .from("investments")
-      .select("id, team_id, round_id");
+    const [roundResult, teamResult, investmentResult, hintViewResult] =
+      await Promise.all([
+        supabase
+          .from("rounds")
+          .select("id, is_open, is_result_open"),
+        supabase.from("teams").select("id, cash"),
+        supabase.from("investments").select("id, team_id, round_id"),
+        supabase
+          .from("team_hint_views")
+          .select("id, team_id, round_id"),
+      ]);
 
-    const { data: hintViewData } = await supabase
-      .from("team_hint_views")
-      .select("id, team_id, round_id");
+    const firstError =
+      roundResult.error ??
+      teamResult.error ??
+      investmentResult.error ??
+      hintViewResult.error;
 
-    setRounds(roundData ?? []);
-    setTeams((teamData ?? []) as Team[]);
-    setInvestments(investmentData ?? []);
-    setHintViews(hintViewData ?? []);
-  };
-
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const openRound = async (roundId: string) => {
-    const ok = confirm("이 라운드를 여시겠습니까?");
-    if (!ok) return;
-
-    setLoading(true);
-
-    const response = await fetch("/api/rounds/open", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ roundId }),
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      alert(data.error ?? "라운드 열기에 실패했습니다.");
+    if (firstError) {
+      console.error("관리자 데이터 조회 실패:", firstError);
+      setLoadError(
+        "데이터를 불러오지 못했습니다. Supabase 연결과 초기화 SQL을 확인해 주세요."
+      );
+      return;
     }
 
-    await loadData();
-    setLoading(false);
+    const roundStateMap = new Map(
+      ((roundResult.data ?? []) as RoundStateRow[]).map((round) => [
+        round.id,
+        round,
+      ])
+    );
+
+    const teamStateMap = new Map(
+      ((teamResult.data ?? []) as TeamStateRow[]).map((team) => [
+        team.id,
+        team,
+      ])
+    );
+
+    setRounds(
+      ROUNDS.map((round) => {
+        const state = roundStateMap.get(round.id);
+        return {
+          ...round,
+          isOpen: Boolean(state?.is_open),
+          isResultOpen: Boolean(state?.is_result_open),
+        };
+      })
+    );
+
+    setTeams(
+      TEAMS.map((team) => ({
+        ...team,
+        cash: Number(teamStateMap.get(team.id)?.cash ?? 0),
+      }))
+    );
+
+    setInvestments((investmentResult.data ?? []) as InvestmentRow[]);
+    setHintViews((hintViewResult.data ?? []) as HintViewRow[]);
+  }, []);
+
+  useEffect(() => {
+    void loadData();
+  }, [loadData]);
+
+  const openRound = async (roundId: string) => {
+    const round = rounds.find((item) => item.id === roundId);
+
+    if (!round) return;
+
+    const ok = confirm(
+      `${round.roundNumber}라운드(${round.startYear}~${round.endYear})를 여시겠습니까? 현재 열린 라운드는 닫힙니다.`
+    );
+
+    if (!ok) return;
+
+    try {
+      setLoadingAction(`open-${roundId}`);
+
+      const response = await fetch("/api/rounds/open", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ roundId }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        alert(data.error ?? "라운드 열기에 실패했습니다.");
+        return;
+      }
+
+      await loadData();
+    } catch (error) {
+      console.error(error);
+      alert("라운드 열기 중 오류가 발생했습니다.");
+    } finally {
+      setLoadingAction(null);
+    }
   };
 
   const openResult = async (roundId: string) => {
     const ok = confirm(
-      "결과를 공개하시겠습니까? 각 조의 자금에 투자 결과가 반영됩니다."
+      "결과를 공개하시겠습니까? 각 조의 자금에 투자 결과가 반영되며 되돌릴 수 없습니다."
     );
+
     if (!ok) return;
 
-    setLoading(true);
+    try {
+      setLoadingAction(`result-${roundId}`);
 
-    const response = await fetch("/api/rounds/result", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ roundId }),
-    });
+      const response = await fetch("/api/rounds/result", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ roundId }),
+      });
 
-    const data = await response.json();
+      const data = await response.json();
 
-    if (!response.ok) {
-      alert(data.error ?? "결과 공개에 실패했습니다.");
+      if (!response.ok) {
+        alert(data.error ?? "결과 공개에 실패했습니다.");
+        return;
+      }
+
+      await loadData();
+    } catch (error) {
+      console.error(error);
+      alert("결과 공개 중 오류가 발생했습니다.");
+    } finally {
+      setLoadingAction(null);
+    }
+  };
+
+  const resetGame = async () => {
+    const confirmation = prompt(
+      `모든 투자·힌트 기록을 삭제하고 각 조의 자금을 ${INITIAL_CASH.toLocaleString("ko-KR")}원으로 되돌립니다. 계속하려면 reset을 입력하세요.`
+    );
+
+    if (confirmation === null) return;
+
+    if (confirmation !== "reset") {
+      alert('입력값이 올바르지 않습니다. "reset"을 정확히 입력해야 합니다.');
+      return;
     }
 
-    await loadData();
-    setLoading(false);
+    const finalCheck = confirm(
+      "정말 전체 게임을 초기화하시겠습니까? 이 작업은 되돌릴 수 없습니다."
+    );
+
+    if (!finalCheck) return;
+
+    try {
+      setLoadingAction("reset");
+
+      const response = await fetch("/api/admin/reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirmation }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        alert(data.error ?? "초기화에 실패했습니다.");
+        return;
+      }
+
+      alert("전체 게임이 초기화되었습니다.");
+      await loadData();
+    } catch (error) {
+      console.error(error);
+      alert("초기화 중 오류가 발생했습니다.");
+    } finally {
+      setLoadingAction(null);
+    }
   };
 
   const didSubmit = (teamId: string) => {
@@ -124,7 +245,8 @@ export default function AdminPage() {
 
     return investments.some(
       (investment) =>
-        investment.team_id === teamId && investment.round_id === currentRound.id
+        investment.team_id === teamId &&
+        investment.round_id === currentRound.id
     );
   };
 
@@ -132,7 +254,8 @@ export default function AdminPage() {
     if (!currentRound) return 0;
 
     return hintViews.filter(
-      (view) => view.team_id === teamId && view.round_id === currentRound.id
+      (view) =>
+        view.team_id === teamId && view.round_id === currentRound.id
     ).length;
   };
 
@@ -145,6 +268,12 @@ export default function AdminPage() {
         </p>
       </header>
 
+      {loadError && (
+        <div className="rounded-xl bg-red-50 p-4 text-red-700">
+          {loadError}
+        </div>
+      )}
+
       <section className="rounded-xl border p-4">
         <h2 className="text-xl font-bold">라운드 관리</h2>
 
@@ -156,31 +285,49 @@ export default function AdminPage() {
             >
               <div>
                 <div className="font-bold">
-                  {round.round_number}라운드 · {round.start_year}~
-                  {round.end_year}
+                  {round.roundNumber}라운드 · {round.startYear}~{round.endYear}
                 </div>
-
                 <div className="mt-1 text-sm text-gray-500">
-                  {round.is_open ? "현재 열림" : "닫힘"} ·{" "}
-                  {round.is_result_open ? "결과 공개됨" : "결과 미공개"}
+                  {round.isOpen ? "현재 열림" : "닫힘"} ·{" "}
+                  {round.isResultOpen ? "결과 공개됨" : "결과 미공개"}
                 </div>
               </div>
 
               <div className="flex gap-2">
                 <button
+                  type="button"
                   onClick={() => openRound(round.id)}
-                  disabled={loading}
-                  className="rounded-lg border px-4 py-2 hover:bg-gray-100 disabled:opacity-50"
+                  disabled={
+                    loadingAction !== null ||
+                    round.isOpen ||
+                    round.isResultOpen
+                  }
+                  className="rounded-lg border px-4 py-2 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  라운드 열기
+                  {loadingAction === `open-${round.id}`
+                    ? "여는 중..."
+                    : round.isResultOpen
+                      ? "진행 완료"
+                      : round.isOpen
+                        ? "현재 라운드"
+                        : "라운드 열기"}
                 </button>
 
                 <button
+                  type="button"
                   onClick={() => openResult(round.id)}
-                  disabled={loading || round.is_result_open}
-                  className="rounded-lg bg-black px-4 py-2 text-white disabled:opacity-50"
+                  disabled={
+                    loadingAction !== null ||
+                    !round.isOpen ||
+                    round.isResultOpen
+                  }
+                  className="rounded-lg bg-black px-4 py-2 text-white disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  결과 공개
+                  {loadingAction === `result-${round.id}`
+                    ? "반영 중..."
+                    : round.isResultOpen
+                      ? "결과 공개됨"
+                      : "결과 공개"}
                 </button>
               </div>
             </div>
@@ -190,19 +337,17 @@ export default function AdminPage() {
 
       <section className="rounded-xl border p-4">
         <h2 className="text-xl font-bold">현재 진행 현황</h2>
-
-        {!currentRound ? (
-          <p className="mt-3 text-gray-500">현재 열린 라운드가 없습니다.</p>
-        ) : (
-          <p className="mt-3">
-            현재 {currentRound.round_number}라운드 진행 중입니다.
-          </p>
-        )}
+        <p className="mt-2 text-gray-600">
+          {currentRound
+            ? `현재 ${currentRound.roundNumber}라운드(${currentRound.startYear}~${currentRound.endYear}) 진행 중입니다.`
+            : "현재 열린 라운드가 없습니다."}
+        </p>
 
         <div className="mt-4 overflow-x-auto">
           <table className="w-full border-collapse text-left">
             <thead>
-              <tr className="border-b">
+              <tr className="border-b bg-gray-50">
+                <th className="p-3">순위</th>
                 <th className="p-3">조</th>
                 <th className="p-3">보유 자금</th>
                 <th className="p-3">투자 제출</th>
@@ -210,43 +355,55 @@ export default function AdminPage() {
                 <th className="p-3">학생 링크</th>
               </tr>
             </thead>
-
             <tbody>
-              {teams
-                .slice()
-                .sort((a, b) => Number(b.cash) - Number(a.cash))
-                .map((team) => (
-                  <tr key={team.id} className="border-b">
-                    <td className="p-3 font-bold">{team.name}</td>
-                    <td className="p-3">
-                      {Number(team.cash).toLocaleString("ko-KR")}원
-                    </td>
-                    <td className="p-3">
-                      {didSubmit(team.id) ? (
-                        <span className="rounded-full bg-green-100 px-3 py-1 text-green-700">
-                          제출 완료
-                        </span>
-                      ) : (
-                        <span className="rounded-full bg-red-100 px-3 py-1 text-red-700">
-                          미제출
-                        </span>
-                      )}
-                    </td>
-                    <td className="p-3">{hintCount(team.id)}개</td>
-                    <td className="p-3">
-                      <a
-                        href={`/team/${team.slug}`}
-                        target="_blank"
-                        className="text-blue-600 underline"
-                      >
-                        열기
-                      </a>
-                    </td>
-                  </tr>
-                ))}
+              {rankedTeams.map((team, index) => (
+                <tr key={team.id} className="border-b">
+                  <td className="p-3">{index + 1}위</td>
+                  <td className="p-3 font-semibold">{team.name}</td>
+                  <td className="p-3">
+                    {team.cash.toLocaleString("ko-KR")}원
+                  </td>
+                  <td className="p-3">
+                    {didSubmit(team.id) ? (
+                      <span className="font-semibold text-green-700">
+                        제출 완료
+                      </span>
+                    ) : (
+                      <span className="text-gray-500">미제출</span>
+                    )}
+                  </td>
+                  <td className="p-3">{hintCount(team.id)}개</td>
+                  <td className="p-3">
+                    <Link
+                      href={`/team/${team.slug}`}
+                      target="_blank"
+                      className="underline"
+                    >
+                      열기
+                    </Link>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
+      </section>
+
+      <section className="rounded-xl border border-red-200 bg-red-50 p-4">
+        <h2 className="text-xl font-bold text-red-800">전체 초기화</h2>
+        <p className="mt-2 text-sm leading-6 text-red-700">
+          모든 투자 내역과 힌트 열람 기록을 삭제하고, 8개 조의 자금을 각각{" "}
+          {INITIAL_CASH.toLocaleString("ko-KR")}원으로 되돌리며 모든 라운드를
+          닫습니다.
+        </p>
+        <button
+          type="button"
+          onClick={resetGame}
+          disabled={loadingAction !== null}
+          className="mt-4 rounded-lg bg-red-700 px-4 py-2 font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {loadingAction === "reset" ? "초기화 중..." : "전체 게임 초기화"}
+        </button>
       </section>
     </main>
   );

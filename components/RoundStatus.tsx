@@ -1,12 +1,12 @@
+import type { StaticRound } from "@/lib/gameData";
+
+type ActiveRound = StaticRound & {
+  isOpen: boolean;
+  isResultOpen: boolean;
+};
+
 type RoundStatusProps = {
-  round: {
-    round_number: number;
-    start_year: number;
-    end_year: number;
-    scenario_text: string;
-    is_open: boolean;
-    is_result_open: boolean;
-  } | null;
+  round: ActiveRound | null;
 };
 
 export default function RoundStatus({ round }: RoundStatusProps) {
@@ -24,27 +24,22 @@ export default function RoundStatus({ round }: RoundStatusProps) {
   return (
     <section className="rounded-xl border p-4">
       <div className="text-sm text-gray-500">현재 라운드</div>
-
       <h2 className="mt-1 text-2xl font-bold">
-        {round.round_number}라운드: {round.start_year}년 ~ {round.end_year}년
+        {round.roundNumber}라운드: {round.startYear}년 ~ {round.endYear}년
       </h2>
 
       <p className="mt-4 whitespace-pre-wrap leading-7">
-        {round.scenario_text}
+        {round.scenarioText}
       </p>
 
-      <div className="mt-4 flex gap-2 text-sm">
-        <span className="rounded-full bg-green-100 px-3 py-1 text-green-700">
-          투자 가능
-        </span>
-
-        {round.is_result_open ? (
+      <div className="mt-4 flex flex-wrap gap-2 text-sm">
+        {round.isResultOpen ? (
           <span className="rounded-full bg-blue-100 px-3 py-1 text-blue-700">
             결과 공개됨
           </span>
         ) : (
-          <span className="rounded-full bg-gray-100 px-3 py-1 text-gray-700">
-            결과 미공개
+          <span className="rounded-full bg-green-100 px-3 py-1 text-green-700">
+            투자 가능
           </span>
         )}
       </div>

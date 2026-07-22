@@ -1,14 +1,14 @@
-import { supabase } from "@/lib/supabase";
+import HintPanel from "@/components/HintPanel";
+import InvestmentForm from "@/components/InvestmentForm";
+import RoundStatus from "@/components/RoundStatus";
 import {
   ASSETS,
   HINTS,
-  TEAMS,
-  type StaticHint,
+  getRoundById,
+  getTeamBySlug,
+  type ViewedHint,
 } from "@/lib/gameData";
-
-import RoundStatus from "@/components/RoundStatus";
-import HintPanel from "@/components/HintPanel";
-import InvestmentForm from "@/components/InvestmentForm";
+import { supabase } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
 
@@ -18,40 +18,29 @@ type PageProps = {
   }>;
 };
 
-export default async function TeamPage({
-  params,
-}: PageProps) {
-  const { teamId } = await params;
-  const teamSlug = teamId;
+type HintViewRow = {
+  hint_id: string;
+  deducted_amount: number | string;
+};
 
-  const teamInfo = TEAMS.find(
-    (team) => team.slug === teamSlug
-  );
+export default async function TeamPage({ params }: PageProps) {
+  const { teamId } = await params;
+  const teamInfo = getTeamBySlug(teamId);
 
   if (!teamInfo) {
     return (
       <main className="mx-auto max-w-3xl p-6">
-        <h1 className="text-2xl font-bold">
-          존재하지 않는 조입니다.
-        </h1>
-
-        <p className="mt-2 text-gray-600">
-          주소를 다시 확인해 주세요.
-        </p>
+        <h1 className="text-2xl font-bold">존재하지 않는 조입니다.</h1>
+        <p className="mt-2 text-gray-600">주소를 다시 확인해 주세요.</p>
       </main>
     );
   }
 
-  const [teamResult, roundResult] = await Promise.all([
-    supabase
-      .from("teams")
-      .select("cash")
-      .eq("id", teamInfo.id)
-      .single(),
-
+  const [teamResult, roundStateResult] = await Promise.all([
+    supabase.from("teams").select("cash").eq("id", teamInfo.id).single(),
     supabase
       .from("rounds")
-      .select("*")
+      .select("id, round_number, is_open, is_result_open")
       .eq("is_open", true)
       .order("round_number", { ascending: true })
       .limit(1)
@@ -59,105 +48,99 @@ export default async function TeamPage({
   ]);
 
   if (teamResult.error || !teamResult.data) {
-    console.error(
-      "팀 자금 조회 실패:",
-      teamResult.error
-    );
+    console.error("팀 자금 조회 실패:", teamResult.error);
 
     return (
       <main className="mx-auto max-w-3xl p-6">
         <h1 className="text-2xl font-bold">
           팀 정보를 불러오지 못했습니다.
         </h1>
-
         <p className="mt-2 text-gray-600">
-          잠시 후 다시 시도해 주세요.
+          Supabase 연결 상태와 초기화 SQL 실행 여부를 확인해 주세요.
         </p>
       </main>
     );
   }
 
-  if (roundResult.error) {
-    console.error(
-      "현재 라운드 조회 실패:",
-      roundResult.error
-    );
+  if (roundStateResult.error) {
+    console.error("현재 라운드 조회 실패:", roundStateResult.error);
   }
 
-  const team = {
-    ...teamInfo,
-    cash: Number(teamResult.data.cash),
-  };
+  const currentCash = Number(teamResult.data.cash);
+  const roundState = roundStateResult.data;
+  const staticRound = roundState ? getRoundById(roundState.id) : undefined;
 
-  const round = roundResult.data;
+  const round =
+    roundState && staticRound
+      ? {
+          ...staticRound,
+          isOpen: Boolean(roundState.is_open),
+          isResultOpen: Boolean(roundState.is_result_open),
+        }
+      : null;
 
-  let viewedHints: StaticHint[] = [];
+  let viewedHints: ViewedHint[] = [];
   let alreadySubmitted = false;
 
   if (round) {
-    const [
-      hintViewsResult,
-      existingInvestmentsResult,
-    ] = await Promise.all([
+    const [hintViewsResult, investmentsResult] = await Promise.all([
       supabase
         .from("team_hint_views")
-        .select("hint_id")
-        .eq("team_id", team.id)
+        .select("hint_id, deducted_amount")
+        .eq("team_id", teamInfo.id)
         .eq("round_id", round.id),
-
       supabase
         .from("investments")
         .select("id")
-        .eq("team_id", team.id)
+        .eq("team_id", teamInfo.id)
         .eq("round_id", round.id)
         .limit(1),
     ]);
 
     if (hintViewsResult.error) {
-      console.error(
-        "힌트 열람 기록 조회 실패:",
-        hintViewsResult.error
-      );
+      console.error("힌트 열람 기록 조회 실패:", hintViewsResult.error);
     } else {
-      const viewedHintIds = new Set(
-        (hintViewsResult.data ?? []).map(
-          (item) => item.hint_id
-        )
-      );
+      viewedHints = ((hintViewsResult.data ?? []) as HintViewRow[]).flatMap(
+        (view) => {
+          const hint = HINTS.find((item) => item.id === view.hint_id);
 
-      viewedHints = HINTS.filter(
-        (hint) =>
-          hint.round_id === round.id &&
-          viewedHintIds.has(hint.id)
+          return hint
+            ? [
+                {
+                  ...hint,
+                  deductedAmount: Number(view.deducted_amount),
+                },
+              ]
+            : [];
+        }
       );
     }
 
-    if (existingInvestmentsResult.error) {
-      console.error(
-        "투자 제출 기록 조회 실패:",
-        existingInvestmentsResult.error
-      );
+    if (investmentsResult.error) {
+      console.error("투자 제출 기록 조회 실패:", investmentsResult.error);
     } else {
-      alreadySubmitted = Boolean(
-        existingInvestmentsResult.data?.length
-      );
+      alreadySubmitted = Boolean(investmentsResult.data?.length);
     }
   }
+
+  const resultIsOpen = Boolean(round?.isResultOpen);
+  const hintDisabled = alreadySubmitted || resultIsOpen;
+  const hintDisabledReason = resultIsOpen
+    ? "이미 결과가 공개되어 힌트를 구매할 수 없습니다."
+    : alreadySubmitted
+      ? "투자를 제출한 뒤에는 새 힌트를 구매할 수 없습니다."
+      : undefined;
+  const investmentDisabledReason = resultIsOpen
+    ? "이미 결과가 공개되어 투자할 수 없습니다."
+    : undefined;
 
   return (
     <main className="mx-auto max-w-5xl space-y-6 p-6">
       <header className="rounded-xl bg-black p-6 text-white">
-        <div className="text-sm opacity-70">
-          투자로 만나는 미래 진로
-        </div>
-
-        <h1 className="mt-1 text-3xl font-bold">
-          {team.name}
-        </h1>
-
+        <div className="text-sm opacity-70">투자로 만나는 미래 진로</div>
+        <h1 className="mt-1 text-3xl font-bold">{teamInfo.name}</h1>
         <p className="mt-2">
-          현재 보유 자금:{" "}
-          {team.cash.toLocaleString("ko-KR")}원
+          현재 보유 자금: {currentCash.toLocaleString("ko-KR")}원
         </p>
       </header>
 
@@ -166,16 +149,21 @@ export default async function TeamPage({
       {round && (
         <>
           <HintPanel
-            teamId={team.id}
+            teamId={teamInfo.id}
             roundId={round.id}
             initialViewedHints={viewedHints}
+            disabled={hintDisabled}
+            disabledReason={hintDisabledReason}
           />
 
           <InvestmentForm
-            teamId={team.id}
+            teamId={teamInfo.id}
             roundId={round.id}
             assets={ASSETS}
+            currentCash={currentCash}
             alreadySubmitted={alreadySubmitted}
+            disabled={resultIsOpen}
+            disabledReason={investmentDisabledReason}
           />
         </>
       )}
