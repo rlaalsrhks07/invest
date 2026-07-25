@@ -93,6 +93,9 @@ export default function HintPanel({
   const [loadingLevel, setLoadingLevel] =
     useState<HintLevel | null>(null);
 
+  const hasPurchasedHint =
+    viewedHints.length > 0;
+
   const handleViewHint = async (
     level: HintLevel
   ) => {
@@ -102,6 +105,17 @@ export default function HintPanel({
           "현재는 힌트를 구매할 수 없습니다."
       );
 
+      return;
+    }
+
+    if (hasPurchasedHint) {
+      alert(
+        "이번 라운드에서는 힌트를 하나만 구매할 수 있습니다."
+      );
+      return;
+    }
+
+    if (loadingLevel !== null) {
       return;
     }
 
@@ -309,10 +323,8 @@ export default function HintPanel({
                 }
                 disabled={
                   disabled ||
-                  Boolean(
-                    viewedHint
-                  ) ||
-                  isLoading
+                  hasPurchasedHint ||
+                  loadingLevel !== null
                 }
                 className={
                   viewedHint
@@ -322,9 +334,11 @@ export default function HintPanel({
               >
                 {viewedHint
                   ? "열람 완료"
-                  : isLoading
-                    ? "처리 중..."
-                    : "힌트 구매"}
+                  : hasPurchasedHint
+                    ? "구매 불가"
+                    : isLoading
+                      ? "처리 중..."
+                      : "힌트 구매"}
               </button>
             </article>
           );

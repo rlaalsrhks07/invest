@@ -51,7 +51,7 @@ create table public.team_hint_views (
   hint_id text not null,
   deducted_amount bigint not null check (deducted_amount >= 0),
   created_at timestamptz not null default now(),
-  unique (team_id, round_id, hint_id)
+  unique (team_id, round_id)
 );
 
 create index investments_team_round_idx

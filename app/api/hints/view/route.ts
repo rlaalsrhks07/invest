@@ -51,10 +51,10 @@ export async function POST(request: NextRequest) {
 
     const { data: existingView, error: existingViewError } = await supabase
       .from("team_hint_views")
-      .select("deducted_amount")
+      .select("hint_id, deducted_amount")
       .eq("team_id", teamId)
       .eq("round_id", roundId)
-      .eq("hint_id", hint.id)
+      .limit(1)
       .maybeSingle();
 
     if (existingViewError) {
@@ -66,6 +66,16 @@ export async function POST(request: NextRequest) {
     }
 
     if (existingView) {
+      if (existingView.hint_id !== hint.id) {
+        return NextResponse.json(
+          {
+            error:
+              "이번 라운드에서는 힌트를 하나만 구매할 수 있습니다.",
+          },
+          { status: 409 }
+        );
+      }
+
       const { data: team } = await supabase
         .from("teams")
         .select("cash")
@@ -195,6 +205,16 @@ export async function POST(request: NextRequest) {
 
       if (rollbackError) {
         console.error("힌트 비용 복구 실패:", rollbackError);
+      }
+
+      if (insertViewError.code === "23505") {
+        return NextResponse.json(
+          {
+            error:
+              "이번 라운드에서는 힌트를 하나만 구매할 수 있습니다.",
+          },
+          { status: 409 }
+        );
       }
 
       return NextResponse.json(

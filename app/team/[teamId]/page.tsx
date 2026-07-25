@@ -393,7 +393,11 @@ export default async function TeamPage({
         )
       : false;
 
+  const hasPurchasedHint =
+    viewedHints.length > 0;
+
   const hintDisabled =
+    hasPurchasedHint ||
     alreadySubmitted ||
     resultIsOpen;
 
@@ -402,7 +406,9 @@ export default async function TeamPage({
       ? "이미 결과가 공개되어 힌트를 구매할 수 없습니다."
       : alreadySubmitted
         ? "투자를 제출한 뒤에는 새 힌트를 구매할 수 없습니다."
-        : undefined;
+        : hasPurchasedHint
+          ? "이번 라운드에서는 힌트를 하나만 구매할 수 있습니다."
+          : undefined;
 
   const investmentDisabledReason =
     resultIsOpen
