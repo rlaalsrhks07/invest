@@ -427,13 +427,25 @@ export default function InvestmentForm({
 
   return (
     <section className="rounded-2xl border border-indigo-100 bg-white p-6 shadow-lg shadow-indigo-100/40">
-      <header>
+      <header className="flex items-end justify-between gap-6">
         <div>
           <h2 className="text-2xl font-black text-slate-900">
             산업별 투자
           </h2>
         </div>
 
+        <div className="rounded-xl border border-indigo-100 bg-indigo-50 px-5 py-3 text-right">
+          <div className="text-xs text-indigo-400">
+            투자 가능 현금
+          </div>
+
+          <div className="mt-1 text-xl font-black tabular-nums text-slate-900">
+            {currentCash.toLocaleString(
+              "ko-KR"
+            )}
+            원
+          </div>
+        </div>
       </header>
 
       {(disabled ||
