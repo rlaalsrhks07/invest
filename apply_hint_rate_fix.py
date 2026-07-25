@@ -1,151 +1,102 @@
 from __future__ import annotations
 
-import re
-import shutil
 from pathlib import Path
+import shutil
+import sys
 
-TARGET = Path("components/InvestmentForm.tsx")
-BACKUP = Path("components/InvestmentForm.tsx.before-summary-fix")
+path = Path("components/InvestmentForm.tsx")
 
+if not path.exists():
+    print(f"오류: 파일을 찾을 수 없습니다: {path}")
+    sys.exit(1)
 
-def fail(message: str) -> None:
-    raise SystemExit(f"수정 실패: {message}")
+text = path.read_text(encoding="utf-8")
+lines = text.splitlines(keepends=True)
 
+targets = (
+    "원 (현재 재산의 50%)",
+    "종목당 최대",
+)
 
-def replace_last(text: str, old: str, new: str, label: str) -> str:
-    index = text.rfind(old)
-    if index == -1:
-        fail(f"{label} 위치를 찾지 못했습니다.")
-    return text[:index] + new + text[index + len(old):]
+target_indexes = [
+    i for i, line in enumerate(lines)
+    if any(target in line for target in targets)
+]
 
+if not target_indexes:
+    print("오류: 깨진 안내 문구 블록을 찾지 못했습니다.")
+    print("InvestmentForm.tsx의 오류 줄 주변을 직접 확인해 주세요.")
+    sys.exit(1)
 
-if not TARGET.exists():
-    fail("components/InvestmentForm.tsx 파일이 없습니다. 프로젝트 최상위 폴더에서 실행해 주세요.")
+backup = path.with_name(path.name + ".before-jsx-repair")
+if not backup.exists():
+    shutil.copy2(path, backup)
+    print(f"백업 생성: {backup}")
 
-if not BACKUP.exists():
-    shutil.copy2(TARGET, BACKUP)
+remove_ranges: list[tuple[int, int]] = []
 
-text = TARGET.read_text(encoding="utf-8")
-original = text
+for target_index in target_indexes:
+    # 투자 금액 입력칸의 '원' span을 찾습니다.
+    span_close = None
+    for i in range(target_index - 1, -1, -1):
+        if "</span>" in lines[i]:
+            span_close = i
+            break
+        if "<article" in lines[i]:
+            break
 
-# 1. 제출 직후 화면에 고정해 둘 요약 상태를 추가한다.
-if not re.search(r"const\s*\[\s*submittedSummary\s*,\s*setSubmittedSummary", text):
-    loading_pattern = re.compile(
-        r"(?P<block>\n\s*const \[loading, setLoading\]\s*=\s*\n?\s*useState\(false\);)"
-    )
-    match = loading_pattern.search(text)
-    if not match:
-        fail("loading 상태 선언")
+    if span_close is None:
+        print("오류: 안내 문구 앞의 입력칸 </span>을 찾지 못했습니다.")
+        sys.exit(1)
 
-    insertion = match.group("block") + """
+    # span 다음의 입력칸 wrapper </div>를 찾습니다.
+    input_div_close = None
+    for i in range(span_close + 1, target_index + 1):
+        if "</div>" in lines[i]:
+            input_div_close = i
+            break
 
-  const [
-    submittedSummary,
-    setSubmittedSummary,
-  ] = useState<{
-    totalAmount: number;
-    remainingCash: number;
-  } | null>(null);"""
-    text = text[: match.start()] + insertion + text[match.end() :]
+    if input_div_close is None:
+        print("오류: 입력칸 wrapper의 </div>를 찾지 못했습니다.")
+        sys.exit(1)
 
-# 2. 입력 중 계산값과 제출 완료 후 표시값을 분리한다.
-if "const displayedTotalAmount" not in text:
-    remaining_pattern = re.compile(
-        r"(?P<block>\n\s*const remainingCash\s*=\s*\n?\s*currentCash\s*-\s*totalAmount;)"
-    )
-    match = remaining_pattern.search(text)
-    if not match:
-        fail("remainingCash 계산")
+    # 해당 종목 카드의 </article>을 찾습니다.
+    article_close = None
+    for i in range(target_index + 1, len(lines)):
+        if "</article>" in lines[i]:
+            article_close = i
+            break
+        if "<article" in lines[i]:
+            break
 
-    insertion = match.group("block") + """
+    if article_close is None:
+        print("오류: 안내 문구 뒤의 </article>을 찾지 못했습니다.")
+        sys.exit(1)
 
-  const displayedTotalAmount =
-    submittedSummary?.totalAmount ??
-    totalAmount;
-  const displayedRemainingCash =
-    submittedSummary?.remainingCash ??
-    remainingCash;"""
-    text = text[: match.start()] + insertion + text[match.end() :]
+    # 입력칸 wrapper와 article 사이에는 삭제 대상 안내 JSX만 있어야 합니다.
+    remove_ranges.append((input_div_close + 1, article_close))
 
-# 3. 제출 성공 시 서버가 확정한 투자액과 남은 현금을 저장한다.
-if "setSubmittedSummary({" not in text:
-    submitted_pattern = re.compile(r"\n(?P<indent>\s*)setIsSubmitted\(")
-    match = submitted_pattern.search(text)
-    if not match:
-        fail("setIsSubmitted 호출")
+# 뒤쪽 범위부터 삭제합니다.
+for start, end in sorted(set(remove_ranges), reverse=True):
+    del lines[start:end]
 
-    indent = match.group("indent")
-    block = f"""
-{indent}const serverInvestedAmount =
-{indent}  Number(data.investedAmount);
-{indent}const serverRemainingCash =
-{indent}  Number(data.remainingCash);
+updated = "".join(lines)
 
-{indent}const submittedTotalAmount =
-{indent}  Number.isSafeInteger(
-{indent}    serverInvestedAmount
-{indent}  )
-{indent}    ? serverInvestedAmount
-{indent}    : totalAmount;
-{indent}const submittedRemainingCash =
-{indent}  Number.isSafeInteger(
-{indent}    serverRemainingCash
-{indent}  )
-{indent}    ? serverRemainingCash
-{indent}    : currentCash -
-{indent}      submittedTotalAmount;
+# 문제를 일으킨 고아 JSX 조각이 남았는지 확인합니다.
+remaining = [
+    phrase for phrase in targets
+    if phrase in updated
+]
 
-{indent}setSubmittedSummary({{
-{indent}  totalAmount:
-{indent}    submittedTotalAmount,
-{indent}  remainingCash:
-{indent}    submittedRemainingCash,
-{indent}}});
-"""
-    text = text[: match.start()] + block + text[match.start() :]
+if remaining:
+    print("오류: 일부 안내 문구가 여전히 남아 있습니다:", ", ".join(remaining))
+    sys.exit(1)
 
-# 4. 하단 요약 숫자는 제출 결과 상태를 사용한다.
-if "{displayedTotalAmount.toLocaleString(" not in text:
-    text = replace_last(
-        text,
-        "{totalAmount.toLocaleString(",
-        "{displayedTotalAmount.toLocaleString(",
-        "하단 총 투자 금액 표시",
-    )
+path.write_text(updated, encoding="utf-8")
 
-if "{displayedRemainingCash.toLocaleString(" not in text:
-    text = replace_last(
-        text,
-        "{remainingCash.toLocaleString(",
-        "{displayedRemainingCash.toLocaleString(",
-        "하단 투자 후 현금 표시",
-    )
-
-# 5. 제출 완료 후 currentCash가 갱신되어도 빨간 오류 표시가 생기지 않게 한다.
-if not re.search(r"!isSubmitted\s*&&\s*\(\s*totalAmount\s*>\s*currentCash\s*\|\|\s*hasInvalidAmount\s*\)", text):
-    total_error_pattern = re.compile(
-        r"totalAmount\s*>\s*currentCash\s*\|\|\s*hasInvalidAmount"
-    )
-    matches = list(total_error_pattern.finditer(text))
-    if not matches:
-        fail("하단 총 투자 금액 오류 표시 조건")
-    match = matches[-1]
-    replacement = "!isSubmitted &&\n                  (totalAmount >\n                    currentCash ||\n                    hasInvalidAmount)"
-    text = text[: match.start()] + replacement + text[match.end() :]
-
-if not re.search(r"!isSubmitted\s*&&\s*remainingCash\s*<\s*0", text):
-    remaining_error_pattern = re.compile(r"remainingCash\s*<\s*0")
-    matches = list(remaining_error_pattern.finditer(text))
-    if not matches:
-        fail("하단 투자 후 현금 오류 표시 조건")
-    match = matches[-1]
-    replacement = "!isSubmitted &&\n                  remainingCash <\n                    0"
-    text = text[: match.start()] + replacement + text[match.end() :]
-
-if text == original:
-    print("변경 없음: 이미 투자 제출 요약 버그가 수정된 상태입니다.")
-else:
-    TARGET.write_text(text, encoding="utf-8")
-    print("수정 완료: 투자 제출 후 총 투자 금액과 투자 후 현금이 정상적으로 유지됩니다.")
-    print(f"백업 파일: {BACKUP}")
-    print("이제 npm run build 를 실행해 확인하세요.")
+print("JSX 문법 복구 완료")
+print("- 입력칸 아래에 남은 조건부 안내 블록과 고아 )} 제거")
+print("- 하단 전체 경고, 빨간 테두리, 제출 제한 로직은 건드리지 않음")
+print("")
+print("다음 명령을 실행하세요:")
+print("npm run build")

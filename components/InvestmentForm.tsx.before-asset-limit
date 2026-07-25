@@ -9,9 +9,6 @@ import {
 
 import AssetPriceChart from "@/components/AssetPriceChart";
 import type { StaticAsset } from "@/lib/gameData";
-import {
-  getMaxInvestmentPerAsset,
-} from "@/lib/investmentRules";
 
 type InvestmentFormProps = {
   teamId: string;
@@ -119,77 +116,6 @@ export default function InvestmentForm({
       );
     }, [amounts, assets]);
 
-  const investmentBaseCash =
-    submittedSummary
-      ? submittedSummary.totalAmount +
-        submittedSummary.remainingCash
-      : currentCash;
-
-  const maxInvestmentPerAsset =
-    getMaxInvestmentPerAsset(
-      investmentBaseCash
-    );
-
-  const overLimitAssets =
-    useMemo(() => {
-      return assets.flatMap(
-        (asset) => {
-          const rawValue =
-            amounts[
-              asset.id
-            ] ?? "";
-
-          if (
-            rawValue.trim() ===
-            ""
-          ) {
-            return [];
-          }
-
-          const amount =
-            Number(rawValue);
-
-          if (
-            !Number.isSafeInteger(
-              amount
-            ) ||
-            amount <=
-              maxInvestmentPerAsset
-          ) {
-            return [];
-          }
-
-          return [
-            {
-              assetId:
-                asset.id,
-              assetName:
-                asset.name,
-              amount,
-              excessAmount:
-                amount -
-                maxInvestmentPerAsset,
-            },
-          ];
-        }
-      );
-    }, [
-      amounts,
-      assets,
-      maxInvestmentPerAsset,
-    ]);
-
-  const hasAssetLimitViolation =
-    overLimitAssets.length > 0;
-
-  const getAssetLimitViolation =
-    (assetId: string) =>
-      overLimitAssets.find(
-        (item) =>
-          item.assetId ===
-          assetId
-      );
-
   const remainingCash =
     currentCash - totalAmount;
 
@@ -245,19 +171,6 @@ export default function InvestmentForm({
       ) {
         alert(
           "투자 금액은 0원 이상의 정수로 입력해 주세요."
-        );
-
-        return;
-      }
-
-      if (
-        hasAssetLimitViolation
-      ) {
-
-        alert(
-          `한 종목에는 현재 재산의 50%인 최대 ${maxInvestmentPerAsset.toLocaleString(
-            "ko-KR"
-          )}원까지만 투자할 수 있습니다. 빨간색으로 표시된 투자 금액을 줄여 주세요.`
         );
 
         return;
@@ -507,15 +420,7 @@ export default function InvestmentForm({
                 투자 금액
               </label>
 
-              <div
-                className={`mt-2 flex items-center overflow-hidden rounded-xl border bg-white focus-within:ring-2 ${
-                  getAssetLimitViolation(
-                    asset.id
-                  )
-                    ? "border-red-400 focus-within:border-red-500 focus-within:ring-red-500/10"
-                    : "border-slate-300 focus-within:border-indigo-500 focus-within:ring-indigo-500/10"
-                }`}
-              >
+              <div className="mt-2 flex items-center overflow-hidden rounded-xl border border-slate-300 bg-white focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/10">
 <input
   id={`investment-${asset.id}`}
   type="text"
@@ -545,17 +450,6 @@ export default function InvestmentForm({
       </div>
 
       <div className="sticky bottom-4 z-20 mt-6 rounded-2xl border border-indigo-200 bg-white/95 p-4 shadow-2xl shadow-indigo-200/50 backdrop-blur">
-        {!isSubmitted &&
-          hasAssetLimitViolation && (
-            <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
-              한 종목에는 현재 재산의 50%인 최대{" "}
-              {maxInvestmentPerAsset.toLocaleString(
-                "ko-KR"
-              )}
-              원까지만 투자할 수 있습니다. 빨간색으로 표시된 투자 금액을 줄여 주세요.
-            </div>
-          )}
-
         <div className="flex items-center justify-between gap-6">
           <div className="flex gap-8">
             <div>
@@ -568,8 +462,7 @@ export default function InvestmentForm({
                   !isSubmitted &&
                   (totalAmount >
                     currentCash ||
-                    hasInvalidAmount ||
-                    hasAssetLimitViolation)
+                    hasInvalidAmount)
                     ? "text-red-600"
                     : "text-slate-900"
                 }`}
@@ -611,7 +504,6 @@ export default function InvestmentForm({
             disabled={
               formDisabled ||
               hasInvalidAmount ||
-              hasAssetLimitViolation ||
               totalAmount >
                 currentCash
             }

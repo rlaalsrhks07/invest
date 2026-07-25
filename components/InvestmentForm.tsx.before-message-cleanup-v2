@@ -253,11 +253,13 @@ export default function InvestmentForm({
       if (
         hasAssetLimitViolation
       ) {
+        const firstViolation =
+          overLimitAssets[0];
 
         alert(
-          `한 종목에는 현재 재산의 50%인 최대 ${maxInvestmentPerAsset.toLocaleString(
+          `한 종목에는 현재 재산의 50%까지만 투자할 수 있습니다.\n\n${firstViolation.assetName}의 최대 투자 가능 금액은 ${maxInvestmentPerAsset.toLocaleString(
             "ko-KR"
-          )}원까지만 투자할 수 있습니다. 빨간색으로 표시된 투자 금액을 줄여 주세요.`
+          )}원입니다.`
         );
 
         return;
@@ -539,6 +541,10 @@ export default function InvestmentForm({
                   원
                 </span>
               </div>
+
+                  원 (현재 재산의 50%)
+                </p>
+              )}
             </article>
           )
         )}

@@ -9,6 +9,9 @@ import {
   getTeamById,
 } from "@/lib/gameData";
 
+import {
+  getMaxInvestmentPerAsset,
+} from "@/lib/investmentRules";
 import { supabase } from "@/lib/supabase";
 
 type InvestmentInput = {
@@ -316,6 +319,37 @@ export async function POST(
             "현재 자금 정보가 올바르지 않습니다.",
         },
         { status: 500 }
+      );
+    }
+
+    const maxInvestmentPerAsset =
+      getMaxInvestmentPerAsset(
+        currentCash
+      );
+
+    const overLimitInvestment =
+      investments.find(
+        (investment) =>
+          investment.amount >
+          maxInvestmentPerAsset
+      );
+
+    if (overLimitInvestment) {
+      const assetName =
+        ASSETS.find(
+          (asset) =>
+            asset.id ===
+            overLimitInvestment.assetId
+        )?.name ??
+        overLimitInvestment.assetId;
+
+      return NextResponse.json(
+        {
+          error: `${assetName}에는 현재 재산의 50%인 ${maxInvestmentPerAsset.toLocaleString(
+            "ko-KR"
+          )}원까지만 투자할 수 있습니다.`,
+        },
+        { status: 400 }
       );
     }
 

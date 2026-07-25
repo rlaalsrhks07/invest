@@ -539,6 +539,10 @@ export default function InvestmentForm({
                   원
                 </span>
               </div>
+
+                  원 (현재 재산의 50%)
+                </p>
+              )}
             </article>
           )
         )}
