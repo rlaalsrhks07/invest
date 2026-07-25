@@ -36,7 +36,7 @@ const LEVEL_META: Record<
 > = {
   low: {
     label: "하",
-    percent: 10,
+    percent: 5,
     cardClass:
       "border-sky-200 bg-gradient-to-br from-sky-50 to-white",
     viewedClass:
@@ -48,7 +48,7 @@ const LEVEL_META: Record<
   },
   middle: {
     label: "중",
-    percent: 20,
+    percent: 10,
     cardClass:
       "border-indigo-200 bg-gradient-to-br from-indigo-50 to-white",
     viewedClass:
@@ -60,7 +60,7 @@ const LEVEL_META: Record<
   },
   high: {
     label: "상",
-    percent: 30,
+    percent: 15,
     cardClass:
       "border-violet-200 bg-gradient-to-br from-violet-50 to-white",
     viewedClass:

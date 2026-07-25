@@ -46,6 +46,14 @@ export default function InvestmentForm({
   const [loading, setLoading] =
     useState(false);
 
+  const [
+    submittedSummary,
+    setSubmittedSummary,
+  ] = useState<{
+    totalAmount: number;
+    remainingCash: number;
+  } | null>(null);
+
   const totalAmount =
     useMemo(() => {
       return assets.reduce(
@@ -110,6 +118,13 @@ export default function InvestmentForm({
 
   const remainingCash =
     currentCash - totalAmount;
+
+  const displayedTotalAmount =
+    submittedSummary?.totalAmount ??
+    totalAmount;
+  const displayedRemainingCash =
+    submittedSummary?.remainingCash ??
+    remainingCash;
 
   const formDisabled =
     disabled ||
@@ -245,6 +260,55 @@ export default function InvestmentForm({
 
           return;
         }
+
+        const serverInvestedAmount =
+
+          Number(data.investedAmount);
+
+        const serverRemainingCash =
+
+          Number(data.remainingCash);
+
+
+        const submittedTotalAmount =
+
+          Number.isSafeInteger(
+
+            serverInvestedAmount
+
+          )
+
+            ? serverInvestedAmount
+
+            : totalAmount;
+
+        const submittedRemainingCash =
+
+          Number.isSafeInteger(
+
+            serverRemainingCash
+
+          )
+
+            ? serverRemainingCash
+
+            : currentCash -
+
+              submittedTotalAmount;
+
+
+        setSubmittedSummary({
+
+          totalAmount:
+
+            submittedTotalAmount,
+
+          remainingCash:
+
+            submittedRemainingCash,
+
+        });
+
 
         setIsSubmitted(
           true
@@ -395,14 +459,15 @@ export default function InvestmentForm({
 
               <div
                 className={`mt-1 text-xl font-black tabular-nums ${
-                  totalAmount >
+                  !isSubmitted &&
+                  (totalAmount >
                     currentCash ||
-                  hasInvalidAmount
+                    hasInvalidAmount)
                     ? "text-red-600"
                     : "text-slate-900"
                 }`}
               >
-                {totalAmount.toLocaleString(
+                {displayedTotalAmount.toLocaleString(
                   "ko-KR"
                 )}
                 원
@@ -416,13 +481,14 @@ export default function InvestmentForm({
 
               <div
                 className={`mt-1 text-xl font-black tabular-nums ${
+                  !isSubmitted &&
                   remainingCash <
-                  0
+                    0
                     ? "text-red-600"
                     : "text-slate-900"
                 }`}
               >
-                {remainingCash.toLocaleString(
+                {displayedRemainingCash.toLocaleString(
                   "ko-KR"
                 )}
                 원

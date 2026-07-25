@@ -1,4 +1,8 @@
-export type HintLevel = "low" | "middle" | "high";
+import { HINT_DEDUCTION_RATES } from "./hintConfig";
+import type { HintLevel } from "./hintConfig";
+
+export { HINT_DEDUCTION_RATES };
+export type { HintLevel };
 
 export type StaticTeam = {
   id: string;
@@ -217,11 +221,6 @@ export const ASSET_RETURNS: StaticAssetReturn[] = [
   { roundId: "round-5", assetId: "logistics", returnRate: 7.0 },
 ];
 
-export const HINT_DEDUCTION_RATES: Record<HintLevel, number> = {
-  low: 0.1,
-  middle: 0.2,
-  high: 0.3,
-};
 
 export const HINTS: StaticHint[] = [
   {
